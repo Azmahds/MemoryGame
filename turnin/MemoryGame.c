@@ -1,11 +1,13 @@
-/*	Author: lab
+/*	Author: Hamza Syed
  *  Partner(s) Name: none
  *	Lab Section:
- *	Assignment: Lab #  Exercise #
+ *	Assignment: Lab 11
  *	Exercise Description: [optional - include for your own benefit]
  *
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
+ *
+ *	Demo Link: https://drive.google.com/file/d/10g03Kx6rE_JSjFY9bFXxTBYAj9PLvcTK/view?usp=sharing 
  */
 #include <avr/io.h>
 #ifdef _SIMULATE_
@@ -16,35 +18,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-unsigned char randRow();
-unsigned char randPat(unsigned char pat);
-unsigned char LeftandRight(int cnt, unsigned char LoR);
-unsigned char UpandDown(int cnt, unsigned char UoD);
-void fillArr();
-void correctAns();
-void wrongAns();
-void Lose();
-void Start();
+//Helper Functions
+unsigned char randRow(); //returns random row
+unsigned char randPat(unsigned char pat);  //returns random spot on row
+unsigned char LeftandRight(int cnt, unsigned char LoR); //moves user light left and right
+unsigned char UpandDown(int cnt, unsigned char UoD); //moves user light up and down
+void fillArr(); //fills arrays with random values
+void correctAns(); //outputs checkmark
+void wrongAns();  //outputs x
+void Lose(); //Lose screen
+void Start(); //Start screen
 
-const int MAX = 100;
-int size = 3;
-int totCnt = 1;
-int life = 8;
-unsigned char arrP[100] = {0x20, 0x20, 0x20, 0x20, 0x20};
-unsigned char arrR[100] = {0xFD, 0xFD, 0xFD, 0xFD, 0xFD};
-
-unsigned char memoryOut = 0x01; //checks if random array sshould be outputted
-unsigned char fill = 0x01;
-unsigned char gameStart = 0x00;
+//Global Variables
+const int MAX = 100; //max size of arrays
+int size = 3; //initial and changeable size of array
+int totCnt = 1; //variable to adjust value of size
+int life = 8; //amount of lives left
+unsigned char arrP[100] = {0x20, 0x20, 0x20, 0x20, 0x20}; //array to hold pattern values
+unsigned char arrR[100] = {0xFD, 0xFD, 0xFD, 0xFD, 0xFD}; //array to hold row values
+unsigned char memoryOut = 0x01; //enables endless SM to output values
+unsigned char fill = 0x01; //enables fillArr func call
+unsigned char gameStart = 0x00; //enables game to start
+unsigned char lostLife = 0x00; //updates if life is lost
+int cntR = 1; //helper variable for upanddown func
+int cntP = 1; //helper variable for leftandright func
+int match = 0; //checks how many matches were correct
 
 enum forever {off, on};
-int Endless(int state){
+int Endless(int state){ //outputs memory game
 	static unsigned char pattern = 0x20;    // can go between 0x20 to 0x04
 	static unsigned char row = 0xFD;	// can go between row 0xFD to xFB to xF7
 	static int done = -1;
 	
-	if(fill == 0x01){fillArr(); fill = 0x00;}
-	if(life < 1 || gameStart == 0x00){return state;}
+	if(fill == 0x01){fillArr(); fill = 0x00;} //fills up arrays with random values
+	if(life < 1 || gameStart == 0x00){return state;} //if no lives are left or game hasn't started then return
 
 	switch(state){
 		case off:
@@ -68,12 +75,12 @@ int Endless(int state){
 		break;
 
 		case on:
-		if(done == -1 || done == size){
+		if(done == -1 || done == size){ //lights up gameboard before and after outputting memory game
 			PORTC = 0x3C;
 			PORTD = 0xF1;
 			done++;
 		}
-		else{
+		else{ //outputs memory game
 			pattern = arrP[done];
 			row = arrR[done];
 			done++;
@@ -85,18 +92,14 @@ int Endless(int state){
 	return state;
 }
 
-unsigned char lostLife = 0x00;
-int cntR = 1;
-int cntP = 1;
-int match = 0;
 enum input {init, wait, left, right, up, down, enter};
-int UserIn(int state){
+int UserIn(int state){ //outputs interactable light for user
 	unsigned char input = ~PINB;
 	static unsigned char row = 0xFD;
 	static unsigned char pattern = 0x20;
 	
 	if(memoryOut == 0x01){return state;} //if lights are being output then return until its finished
-	if(life < 1 || gameStart == 0x00){return state;}
+	if(life < 1 || gameStart == 0x00){return state;} //if no lives are left or game hasn't started then return
 	
 	switch(state){
 		case init:
@@ -164,11 +167,11 @@ int UserIn(int state){
 		break;
 
 		case enter:
-			if(pattern == arrP[match] && row == arrR[match]){
+			if(pattern == arrP[match] && row == arrR[match]){ //if the player light matches the memory game output then output checkmark
 				match++;
 				correctAns();
 			}
-			else{
+			else{ //if it was wrong then output X
 				wrongAns();
 				lostLife = 0x01;
 			}
@@ -178,12 +181,12 @@ int UserIn(int state){
 			state = init;
 		break;
 	}
-	if(match >= size){
+	if(match >= size){ 
 		match = 0;
 		memoryOut = 0x01;
 		fill = 0x01;
 		++totCnt;
-		if(totCnt % 3 == 0 && size < 100){
+		if(totCnt % 3 == 0 && size < MAX){ //increases size every 3 rounds
 			++size;
 		}
 	}
@@ -194,11 +197,11 @@ int UserIn(int state){
 }
 
 enum points {Lives, Dec};
-int Score(int state){
-	static unsigned char botLife = 0xFF;
+int Score(int state){ //keeps track of lives
+	static unsigned char botLife = 0xFF;  //keeps track of lives for PORTC output
 
 	if(memoryOut == 0x01){return state;} //if lights are being output then return until its finished
-	if(life < 1 || gameStart == 0x00){return state;}
+	if(life < 1 || gameStart == 0x00){return state;} //if no lives are left or game hasn't started then return
 	
 	if(life == 8){botLife = 0xFF;}
 
@@ -229,20 +232,20 @@ int Score(int state){
 }
 
 enum end{finish, reset, start};
-int GameStartandOver(int state){
+int GameStartandOver(int state){ //game start screen and end screen
 	unsigned char input = ~PINB;
-	if(life > 0 && gameStart == 0x01){return state;}
+	if(life > 0 && gameStart == 0x01){return state;} //if game has already started and the user hasn't lost yet, then return
 	
 	switch(state){
 		case finish:
-			Lose();
+			Lose(); //outputs L
 			if(input == 0x04){
 				state = reset;
 			}
 			else{state = finish;}
 		break;
 		
-		case reset:
+		case reset: //resets game
 			life = 8;
 			memoryOut = 0x01;
 			match = 0;
@@ -253,7 +256,7 @@ int GameStartandOver(int state){
 		break;
 
 		case start:
-			Start();
+			Start(); //outputs S
 			if(input == 0x04){state = finish; gameStart = 0x01;}
 			else{state = start;}
 		break;
@@ -302,7 +305,7 @@ int main(void) {
 		    tasks[i]->state = tasks[i]->TickFct(tasks[i]->state);
 		    tasks[i]->elapsedTime = 0;
 		}
-		tasks[i]->elapsedTime += 1;
+		tasks[i]->elapsedTime += 1; //no need for GCD
 	}
 	while(!TimerFlag){}
 	TimerFlag = 0;
